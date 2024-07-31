@@ -1,0 +1,165 @@
+﻿var webSocket = new WebSocket('wss://127.0.0.1:13579/');
+var heartbeat_msg = '--heartbeat--';
+var heartbeat_interval = null;
+var missed_heartbeats = 0;
+var missed_heartbeats_limit_min = 3;
+var missed_heartbeats_limit_max = 50;
+var missed_heartbeats_limit = missed_heartbeats_limit_min;
+var callback = null;
+//var rw = null;
+
+
+function setMissedHeartbeatsLimitToMax() {
+    missed_heartbeats_limit = missed_heartbeats_limit_max;
+}
+
+function setMissedHeartbeatsLimitToMin() {
+    missed_heartbeats_limit = missed_heartbeats_limit_min;
+}
+
+function blockScreen() {
+    $.blockUI({
+        message: '<img src="js/loading.gif" /><br/>Подождите, идет загрузка Java-апплета...',
+        css: {
+            border: 'none',
+            padding: '15px',
+            backgroundColor: '#000',
+            '-webkit-border-radius': '10px',
+            '-moz-border-radius': '10px',
+            opacity: .5,
+            color: '#fff'
+        }
+    });
+}
+
+function openDialog() {
+    if (confirm("Ошибка при подключений к прослойке NCALayer. Убедитесь что программа NCALayer запущена и нажмите ОК") === true) {
+        location.reload();
+    }
+}
+
+function unBlockScreen() {
+    $.unblockUI();
+}
+
+webSocket.onopen = function (event) {
+    if (heartbeat_interval === null) {
+        missed_heartbeats = 0;
+        heartbeat_interval = setInterval(pingLayer, 2000);
+    }
+    console.log("Connection opened");
+};
+
+webSocket.onclose = function (event) {
+  if (event.wasClean) {
+    console.log('connection has been closed');
+  }
+  console.log('Code: ' + event.code + ' Reason: ' + event.reason);
+};
+
+
+webSocket.onmessage = function (event) {
+    if (event.data === heartbeat_msg) {
+        missed_heartbeats = 0;
+        return;
+    }
+
+    var result = JSON.parse(event.data);
+
+	// if (result != null) {
+	// 	var rw = {
+	// 		code: result['code'],
+	// 		message: result['message'],
+	// 		responseObject: result['responseObject'],
+	// 		getResult: function () {
+	// 			return this.result;
+	// 		},
+	// 		getMessage: function () {
+	// 			return this.message;
+	// 		},
+	// 		getResponseObject: function () {
+	// 			return this.responseObject;
+	// 		},
+	// 		getCode: function () {
+	// 			return this.code;
+	// 		}
+	// 	};
+	// 	// window[callback](rw);
+	// }
+	console.log(event);
+    setMissedHeartbeatsLimitToMin();
+};
+
+function activateWebSocket() {
+  if (webSocket.readyState === webSocket.CLOSED) {
+    openDialog();
+  }
+}
+
+function pingLayer() {
+    try {
+        missed_heartbeats++;
+        if (missed_heartbeats >= missed_heartbeats_limit)
+            throw new Error("Too many missed heartbeats.");
+        webSocket.send(heartbeat_msg);
+    } catch (e) {
+        clearInterval(heartbeat_interval);
+        heartbeat_interval = null;
+        console.warn("Closing connection. Reason: " + e.message);
+        webSocket.close();
+    }
+}
+
+function getActiveTokens(callBack) {
+    var getActiveTokens = {
+		"module": "kz.gov.pki.knca.commonUtils",
+        "method": "getActiveTokens"
+    };
+    callback = callBack;
+    setMissedHeartbeatsLimitToMax();
+    webSocket.send(JSON.stringify(getActiveTokens));
+}
+
+function getKeyInfo(storageName, callBack) {
+    var getKeyInfo = {
+		"module": "kz.gov.pki.knca.commonUtils",
+        "method": "getKeyInfo",
+        "args": [storageName]
+    };
+    callback = callBack;
+    setMissedHeartbeatsLimitToMax();
+    webSocket.send(JSON.stringify(getKeyInfo));
+}
+
+function signXml(storageName, keyType, xmlToSign, callBack) {
+    var signXml = {
+		"module": "kz.gov.pki.knca.commonUtils",
+        "method": "signXml",
+        "args": [storageName, keyType, xmlToSign, "", ""]
+    };
+    callback = callBack;
+    setMissedHeartbeatsLimitToMax();
+    webSocket.send(JSON.stringify(signXml));
+}
+
+function createCMSSignatureFromFile(storageName, keyType, filePath, flag, callBack) {
+    var createCMSSignatureFromFile = {
+		"module": "kz.gov.pki.knca.commonUtils",
+        "method": "createCMSSignatureFromFile",
+        "args": [storageName, keyType, filePath, flag]
+    };
+    callback = callBack;
+    setMissedHeartbeatsLimitToMax();
+    webSocket.send(JSON.stringify(createCMSSignatureFromFile));
+}
+
+function showFileChooser(fileExtension, currentDirectory, callBack) {
+    var showFileChooser = {
+		"module": "kz.gov.pki.knca.commonUtils",
+        "method": "showFileChooser",
+        "args": [fileExtension, currentDirectory]
+    };
+    callback = callBack;
+    setMissedHeartbeatsLimitToMax();
+    webSocket.send(JSON.stringify(showFileChooser));
+}
